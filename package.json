@@ -11,12 +11,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Dj-Shortcut/openclaw-messenger.git"
+    "url": "git+https://github.com/Dj-Shortcut/openclaw-facebook-messenger.git"
   },
   "bugs": {
-    "url": "https://github.com/Dj-Shortcut/openclaw-messenger/issues"
+    "url": "https://github.com/Dj-Shortcut/openclaw-facebook-messenger/issues"
   },
-  "homepage": "https://github.com/Dj-Shortcut/openclaw-messenger#readme",
+  "homepage": "https://github.com/Dj-Shortcut/openclaw-facebook-messenger#readme",
   "files": [
     "dist",
     "openclaw.plugin.json",
