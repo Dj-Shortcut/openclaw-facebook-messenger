@@ -1,0 +1,127 @@
+{
+  "id": "facebook",
+  "name": "Facebook",
+  "description": "Facebook Page Messenger direct messages via Meta webhooks.",
+  "legacyPluginIds": ["messenger"],
+  "activation": {
+    "onStartup": false
+  },
+  "channels": ["facebook"],
+  "channelConfigs": {
+    "facebook": {
+      "label": "Facebook",
+      "description": "Facebook Page Messenger direct messages via Meta webhooks.",
+      "preferOver": ["messenger"],
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "pageId": { "type": "string" },
+          "pageAccessToken": { "type": "string" },
+          "tokenFile": { "type": "string" },
+          "appSecret": { "type": "string" },
+          "appSecretFile": { "type": "string" },
+          "verifyToken": { "type": "string" },
+          "verifyTokenFile": { "type": "string" },
+          "name": { "type": "string" },
+          "allowFrom": {
+            "type": "array",
+            "items": { "type": ["string", "number"] }
+          },
+          "dmPolicy": {
+            "type": "string",
+            "enum": ["open", "allowlist", "pairing", "disabled"],
+            "default": "pairing"
+          },
+          "unknownSenderMode": {
+            "type": "string",
+            "enum": ["pairing", "leaderbot_free_tier"]
+          },
+          "leaderbotBridgeEnabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "defaultLang": {
+            "type": "string",
+            "enum": ["nl", "en"],
+            "default": "nl"
+          },
+          "responsePrefix": { "type": "string" },
+          "webhookPath": { "type": "string" },
+          "defaultTo": { "type": "string" },
+          "graphApiVersion": { "type": "string" },
+          "defaultAccount": { "type": "string" },
+          "sharedStateStore": {
+            "type": "string",
+            "enum": ["memory", "redis"],
+            "default": "memory"
+          },
+          "accounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "pageId": { "type": "string" },
+                "pageAccessToken": { "type": "string" },
+                "tokenFile": { "type": "string" },
+                "appSecret": { "type": "string" },
+                "appSecretFile": { "type": "string" },
+                "verifyToken": { "type": "string" },
+                "verifyTokenFile": { "type": "string" },
+                "name": { "type": "string" },
+                "allowFrom": {
+                  "type": "array",
+                  "items": { "type": ["string", "number"] }
+                },
+                "dmPolicy": {
+                  "type": "string",
+                  "enum": ["open", "allowlist", "pairing", "disabled"],
+                  "default": "pairing"
+                },
+                "unknownSenderMode": {
+                  "type": "string",
+                  "enum": ["pairing", "leaderbot_free_tier"]
+                },
+                "leaderbotBridgeEnabled": {
+                  "type": "boolean"
+                },
+                "defaultLang": {
+                  "type": "string",
+                  "enum": ["nl", "en"]
+                },
+                "responsePrefix": { "type": "string" },
+                "webhookPath": { "type": "string" },
+                "defaultTo": { "type": "string" },
+                "graphApiVersion": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "uiHints": {
+        "pageId": { "label": "Facebook Page ID" },
+        "pageAccessToken": { "label": "Page access token", "sensitive": true },
+        "tokenFile": { "label": "Page access token file" },
+        "appSecret": { "label": "App secret", "sensitive": true },
+        "appSecretFile": { "label": "App secret file" },
+        "verifyToken": { "label": "Webhook verify token", "sensitive": true },
+        "verifyTokenFile": { "label": "Webhook verify token file" },
+        "webhookPath": { "label": "Webhook path", "placeholder": "/facebook/webhook" },
+        "dmPolicy": { "label": "Direct message policy" },
+        "unknownSenderMode": { "label": "Unknown sender mode (legacy bridge compatibility)" },
+        "leaderbotBridgeEnabled": { "label": "Enable legacy Leaderbot bridge" },
+        "defaultLang": { "label": "Default response language" },
+        "sharedStateStore": { "label": "Shared dedupe and budget store" },
+        "allowFrom": { "label": "Allowed Page-scoped sender IDs" }
+      }
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

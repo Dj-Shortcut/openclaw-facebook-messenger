@@ -1,0 +1,190 @@
+#!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
+import process from "node:process";
+
+const root = process.cwd();
+
+function readText(relativePath) {
+  return fs.readFileSync(path.join(root, relativePath), "utf8");
+}
+
+function readJson(relativePath) {
+  return JSON.parse(readText(relativePath));
+}
+
+function fail(message) {
+  throw new Error(message);
+}
+
+function expectEqual(label, actual, expected) {
+  if (actual !== expected) {
+    fail(`${label} mismatch: expected ${expected}, found ${actual ?? "<missing>"}`);
+  }
+}
+
+function expectMatch(label, text, pattern, expected) {
+  const match = pattern.exec(text);
+  if (!match) {
+    fail(`${label} missing`);
+  }
+  expectEqual(label, match[1].trim(), expected);
+}
+
+function readPnpmRootImporter(lockfile) {
+  const importers = /^importers:\s*$/m.exec(lockfile);
+  if (!importers) {
+    fail("pnpm-lock importers section missing");
+  }
+
+  const importersText = lockfile.slice(importers.index + importers[0].length);
+  const rootImporter = /^  \.:\s*$/m.exec(importersText);
+  if (!rootImporter) {
+    fail("pnpm-lock root importer missing");
+  }
+
+  const rootText = importersText.slice(
+    rootImporter.index + rootImporter[0].length,
+  );
+  const nextImporterOrSection = /^(?:  \S[^\n]*:|\S[^\n]*:)\s*$/m.exec(rootText);
+  return nextImporterOrSection
+    ? rootText.slice(0, nextImporterOrSection.index)
+    : rootText;
+}
+
+function readCargoPackageVersion(relativePath) {
+  const cargoToml = readText(relativePath);
+  const packageSection = /\[package\]([\s\S]*?)(?:\n\[|$)/.exec(cargoToml)?.[1];
+  if (!packageSection) {
+    fail(`${relativePath} [package] section missing`);
+  }
+  return /^version\s*=\s*"([^"]+)"/m.exec(packageSection)?.[1];
+}
+
+const pkg = readJson("package.json");
+const lock = readJson("package-lock.json");
+const pnpmLock = readText("pnpm-lock.yaml");
+const pluginVersion = pkg.version;
+const openclawVersion = pkg.openclaw?.build?.openclawVersion;
+const pluginSdkVersion = pkg.openclaw?.build?.pluginSdkVersion;
+const minHostVersion = pkg.openclaw?.install?.minHostVersion;
+const minGatewayVersion = pkg.openclaw?.compat?.minGatewayVersion;
+const openclawSpecifier = openclawVersion?.includes("-")
+  ? openclawVersion
+  : `^${openclawVersion}`;
+
+if (!pluginVersion) {
+  fail("package.json version missing");
+}
+if (!openclawVersion) {
+  fail("package.json openclaw.build.openclawVersion missing");
+}
+
+expectEqual("OpenClaw plugin SDK version", pluginSdkVersion, openclawVersion);
+expectEqual("package-lock root version", lock.version, pluginVersion);
+expectEqual("package-lock packages[''].version", lock.packages?.[""]?.version, pluginVersion);
+expectEqual(
+  "package-lock root OpenClaw specifier",
+  lock.packages?.[""]?.devDependencies?.openclaw,
+  openclawSpecifier,
+);
+const pnpmRootImporter = readPnpmRootImporter(pnpmLock);
+expectMatch(
+  "pnpm-lock root OpenClaw specifier",
+  pnpmRootImporter,
+  /^ {6}openclaw:\n {8}specifier: ([^\n]+)$/m,
+  openclawSpecifier,
+);
+expectMatch(
+  "pnpm-lock root OpenClaw version",
+  pnpmRootImporter,
+  /^ {6}openclaw:\n {8}specifier: [^\n]+\n {8}version: ([^\n]+)$/m,
+  openclawVersion,
+);
+if (!pnpmLock.includes(`\n  openclaw@${openclawVersion}:\n`)) {
+  fail(`pnpm-lock OpenClaw package ${openclawVersion} missing`);
+}
+expectEqual(
+  "package.json devDependency openclaw",
+  pkg.devDependencies?.openclaw,
+  openclawSpecifier,
+);
+
+const dockerfile = readText("deploy/fly-gateway/Dockerfile");
+expectMatch(
+  "Fly gateway OPENCLAW_VERSION",
+  dockerfile,
+  /^ARG OPENCLAW_VERSION=(.+)$/m,
+  openclawVersion,
+);
+
+const manifestTest = readText("manifest.test.ts");
+expectMatch(
+  "manifest test OpenClaw version",
+  manifestTest,
+  /openclawVersion: "([^"]+)"/,
+  openclawVersion,
+);
+expectMatch(
+  "manifest test plugin SDK version",
+  manifestTest,
+  /pluginSdkVersion: "([^"]+)"/,
+  openclawVersion,
+);
+expectMatch(
+  "manifest test min gateway version",
+  manifestTest,
+  /minGatewayVersion: "([^"]+)"/,
+  minGatewayVersion,
+);
+expectMatch(
+  "manifest test min host version",
+  manifestTest,
+  /minHostVersion: "([^"]+)"/,
+  minHostVersion,
+);
+
+const listing = readText("docs/clawhub-listing.md");
+expectMatch(
+  "ClawHub listing OpenClaw tested version",
+  listing,
+  /- OpenClaw build tested with: `([^`]+)`/,
+  openclawVersion,
+);
+expectMatch(
+  "ClawHub listing plugin version",
+  listing,
+  /- Plugin version: `([^`]+)`/,
+  pluginVersion,
+);
+expectMatch(
+  "ClawHub listing release notes version",
+  listing,
+  /## Release Notes For ([^\n]+)/,
+  pluginVersion,
+);
+expectMatch(
+  "ClawHub listing verified tarball version",
+  listing,
+  /dj-shortcut-facebook-([^`]+)\.tgz/,
+  pluginVersion,
+);
+
+console.log(
+  JSON.stringify(
+    {
+      ok: true,
+      pluginVersion,
+      openclawVersion,
+      checked: [
+        "root package and lockfiles",
+        "OpenClaw runtime metadata",
+        "Fly gateway Dockerfile",
+        "manifest test expectations",
+        "ClawHub listing copy",
+      ],
+    },
+    null,
+    2,
+  ),
+);

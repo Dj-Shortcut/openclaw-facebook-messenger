@@ -1,0 +1,143 @@
+{
+  "name": "@dj-shortcut/facebook",
+  "version": "2026.7.2-beta.7",
+  "private": true,
+  "description": "Standalone OpenClaw Messenger channel plugin",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.15.0",
+    "npm": ">=11.12.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dj-Shortcut/openclaw-messenger.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Dj-Shortcut/openclaw-messenger/issues"
+  },
+  "homepage": "https://github.com/Dj-Shortcut/openclaw-messenger#readme",
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md",
+    "docs/clawhub-listing.md",
+    "docs/clawhub.md",
+    "docs/facebook-complete-tutorial.md",
+    "docs/openclaw-update.md",
+    "docs/operator-prompt-routing.md",
+    "docs/setup.md",
+    "docs/standalone-messenger.md",
+    "examples"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./api": {
+      "types": "./dist/channel-plugin-api.d.ts",
+      "default": "./dist/channel-plugin-api.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime-api.d.ts",
+      "default": "./dist/runtime-api.js"
+    },
+    "./setup": {
+      "types": "./dist/setup-entry.d.ts",
+      "default": "./dist/setup-entry.js"
+    },
+    "./configured-state": {
+      "types": "./dist/configured-state.d.ts",
+      "default": "./dist/configured-state.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "clean": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "test": "node ./scripts/run-vitest.mjs configured-state.test.ts manifest.test.ts src/accounts.test.ts src/gateway.test.ts src/send.test.ts src/setup-surface.test.ts src/signature.test.ts src/status.test.ts src/webhook.test.ts src/presentation.test.ts src/messenger-state-store.test.ts src/messenger-i18n.test.ts",
+    "test:plugin": "node ./scripts/run-vitest.mjs configured-state.test.ts manifest.test.ts src",
+    "test:production-contracts": "node ./scripts/run-vitest.mjs scripts/check-package-manager-contract.test.mjs scripts/classify-ci-changes.test.mjs scripts/image-gen-migration-smoke-workflow.test.mjs scripts/messenger-smoke-checklist.test.mjs scripts/validate-production-deployment.test.mjs",
+    "test:legacy-gateway": "node ./scripts/run-vitest.mjs deploy/fly-gateway scripts/gateway-state-rebaseline-workflow.test.mjs scripts/select-fresh-fly-snapshot.test.mjs scripts/validate-gateway-deployment-safety.test.mjs scripts/verify-gateway-state-rebaseline.test.mjs",
+    "prepare": "npm run build",
+    "pack:dry": "npm pack --dry-run",
+    "check": "npm run build && npm test && npm run pack:dry",
+    "fallow": "npx --yes fallow@2.27.0 --root .",
+    "fallow:list": "npx --yes fallow@2.27.0 --root . list",
+    "fallow:production": "npx --yes fallow@2.27.0 --root . --production",
+    "fallow:report": "mkdir -p .fallow && npx --yes fallow@2.27.0 --root . -f json > .fallow/report.json && node scripts/normalize-fallow-report.mjs --root . .fallow/report.json",
+    "fallow:report:production": "mkdir -p .fallow && npx --yes fallow@2.27.0 --root . --production -f json > .fallow/report-production.json && node scripts/normalize-fallow-report.mjs --root . .fallow/report-production.json",
+    "fallow:summary": "npx --yes fallow@2.27.0 --root . --summary --score",
+    "check:product-boundaries": "node scripts/check-product-boundaries.mjs",
+    "check:package-managers": "node scripts/check-package-manager-contract.mjs"
+  },
+  "dependencies": {
+    "ioredis": "^6.0.0",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.6.11 || 2026.7.2-beta.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "openclaw": "2026.7.2-beta.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "hono": "4.12.34",
+    "nanoid@3": "3.3.18"
+  },
+  "openclaw": {
+    "compat": {
+      "pluginApi": ">=2026.6.11",
+      "minGatewayVersion": "2026.6.11"
+    },
+    "build": {
+      "openclawVersion": "2026.7.2-beta.7",
+      "pluginSdkVersion": "2026.7.2-beta.7"
+    },
+    "install": {
+      "clawhubSpec": "clawhub:@dj-shortcut/facebook",
+      "defaultChoice": "clawhub",
+      "minHostVersion": ">=2026.6.11"
+    },
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "runtimeExtensions": [
+      "./dist/index.js"
+    ],
+    "setupEntry": "./dist/setup-entry.js",
+    "runtimeSetupEntry": "./dist/setup-entry.js",
+    "channel": {
+      "id": "facebook",
+      "label": "Facebook",
+      "aliases": [
+        "messenger",
+        "fb",
+        "fbm"
+      ],
+      "selectionLabel": "Facebook (Page Messenger)",
+      "detailLabel": "Facebook Page",
+      "docsPath": "/channels/facebook",
+      "docsLabel": "facebook",
+      "blurb": "Facebook Page Messenger DMs via Meta webhooks.",
+      "systemImage": "message.fill",
+      "preferOver": [
+        "messenger"
+      ],
+      "exposure": {
+        "configured": true,
+        "setup": true,
+        "docs": true
+      },
+      "quickstartAllowFrom": true,
+      "configuredState": {
+        "specifier": "./configured-state",
+        "exportName": "hasFacebookConfiguredState"
+      }
+    }
+  }
+}
