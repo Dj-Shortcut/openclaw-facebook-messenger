@@ -1397,7 +1397,10 @@ type MessengerIngressDecision =
   | { action: "stop"; commandAuthorized: false };
 
 function isLeaderbotBridgeEnabled(account: ResolvedMessengerAccount): boolean {
-  return account.config.leaderbotBridgeEnabled === true;
+  // The standalone repository is Messenger chat only. Keep the old config
+  // field readable for migration, but never activate the retired bridge.
+  void account;
+  return false;
 }
 
 function shouldRouteUnknownSenderToLeaderbotFreeTier(params: {

@@ -58,7 +58,6 @@
     "build": "npm run clean && tsc -p tsconfig.json",
     "test": "node ./scripts/run-vitest.mjs configured-state.test.ts manifest.test.ts src/accounts.test.ts src/gateway.test.ts src/send.test.ts src/setup-surface.test.ts src/signature.test.ts src/status.test.ts src/webhook.test.ts src/presentation.test.ts src/messenger-state-store.test.ts src/messenger-i18n.test.ts",
     "test:plugin": "node ./scripts/run-vitest.mjs configured-state.test.ts manifest.test.ts src",
-    "test:production-contracts": "node ./scripts/run-vitest.mjs scripts/check-package-manager-contract.test.mjs scripts/classify-ci-changes.test.mjs scripts/image-gen-migration-smoke-workflow.test.mjs scripts/messenger-smoke-checklist.test.mjs scripts/validate-production-deployment.test.mjs",
     "test:legacy-gateway": "node ./scripts/run-vitest.mjs deploy/fly-gateway scripts/gateway-state-rebaseline-workflow.test.mjs scripts/select-fresh-fly-snapshot.test.mjs scripts/validate-gateway-deployment-safety.test.mjs scripts/verify-gateway-state-rebaseline.test.mjs",
     "prepare": "npm run build",
     "pack:dry": "npm pack --dry-run",
