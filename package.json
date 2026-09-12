@@ -21,11 +21,8 @@
     "dist",
     "openclaw.plugin.json",
     "README.md",
-    "docs/clawhub-listing.md",
-    "docs/clawhub.md",
-    "docs/facebook-complete-tutorial.md",
-    "docs/openclaw-update.md",
-    "docs/operator-prompt-routing.md",
+    "docs/security/README.md",
+    "docs/security/SECURITY.md",
     "docs/setup.md",
     "docs/standalone-messenger.md",
     "examples"

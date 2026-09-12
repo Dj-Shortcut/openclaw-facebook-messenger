@@ -8,7 +8,7 @@ export type MessengerStateScope = Readonly<{
   pageId: string;
 }>;
 
-export type MessengerBudgetKind = "image_forward" | "audio_transcription";
+export type MessengerBudgetKind = "audio_transcription";
 
 export type MessengerDailyBudgetResult =
   | { ok: true; count: number; cap: number }

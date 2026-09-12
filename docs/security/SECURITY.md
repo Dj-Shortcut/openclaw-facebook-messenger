@@ -13,7 +13,7 @@ Development:
 
 Production:
 
-* secrets are injected via Fly.io
+* secrets are injected via the OpenClaw host's deployment environment
 
 Future improvements:
 
@@ -41,7 +41,6 @@ Protection mechanisms:
 Additional protections:
 
 * rate limiting
-* per-user quota
 * request body size limits
 * webhook replay protection with temporary event-key storage
 
@@ -51,7 +50,6 @@ Replay protection:
 * fallback key: `entry.id + sender + timestamp`
 * duplicate webhook events are ignored for a short TTL window
 * Redis-backed `SET NX EX` is recommended in production to survive restarts and multi-instance deploys
-* in Leaderbot production, `REDIS_URL` is required so replay protection cannot silently fall back to in-memory storage
 
 Example strategy:
 
@@ -65,21 +63,16 @@ if (claimed !== "OK") {
 
 ## 3. Rate limiting & abuse protection
 
-AI endpoints must be protected against abuse.
+The plugin is a transport boundary. Host applications remain responsible for
+model access, tool permissions, rate limits, and any provider-specific cost
+controls.
 
-Implemented / planned protections:
+Typical abuse protections at this boundary include:
 
-* global HTTP rate limiting
-* Redis-backed rate limiting
-* per user quota
-* daily usage limits
-* prevention of token drain attacks
-
-Typical abuse patterns:
-
-* prompt farming
-* automated image generation abuse
-* API cost draining
+* global HTTP rate limiting;
+* request body size limits;
+* sender authorization and pairing;
+* prevention of token-drain attacks through the host policy.
 
 ## 4. Input validation
 
@@ -162,13 +155,11 @@ Recommended production architecture:
 ```text
 Internet
 ↓
-Fly Edge
+HTTPS gateway
 ↓
-Webhook Server
+OpenClaw host
 ↓
-Redis (private network)
-↓
-OpenAI API
+optional Redis (private network)
 ```
 
 Key principles:
@@ -176,13 +167,8 @@ Key principles:
 * Redis not publicly accessible
 * only internal services communicate with Redis
 
-## 10. AI abuse protection
+## 10. Host application boundary
 
-AI applications require additional safeguards against misuse.
-
-Typical protections:
-
-* per-user quotas
-* rate limiting
-* abuse detection
-* cost control mechanisms
+The plugin does not select models, call image or video providers, process
+payments, or manage application quotas. The OpenClaw host and its configured
+tools own those decisions.

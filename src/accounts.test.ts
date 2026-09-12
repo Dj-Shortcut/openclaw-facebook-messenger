@@ -87,23 +87,23 @@ describe("resolveMessengerAccount", () => {
             appSecret: "base-secret",
             verifyToken: "base-verify",
             accounts: {
-              leaderbot: {
-                pageId: "leader-page",
-                pageAccessToken: "leader-token",
-                appSecret: "leader-secret",
-                verifyToken: "leader-verify",
+              secondary: {
+                pageId: "secondary-page",
+                pageAccessToken: "secondary-token",
+                appSecret: "secondary-secret",
+                verifyToken: "secondary-verify",
               },
             },
           },
         },
       } as never,
-      accountId: "leaderbot",
+      accountId: "secondary",
     });
 
-    expect(account.pageId).toBe("leader-page");
-    expect(account.pageAccessToken).toBe("leader-token");
-    expect(account.appSecret).toBe("leader-secret");
-    expect(account.verifyToken).toBe("leader-verify");
+    expect(account.pageId).toBe("secondary-page");
+    expect(account.pageAccessToken).toBe("secondary-token");
+    expect(account.appSecret).toBe("secondary-secret");
+    expect(account.verifyToken).toBe("secondary-verify");
     expect(account.enabled).toBe(false);
   });
 

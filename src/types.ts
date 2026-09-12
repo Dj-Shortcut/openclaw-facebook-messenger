@@ -4,7 +4,6 @@ import type { MessengerLanguage } from "./messenger-i18n.js";
 import type { MessengerSharedStateStoreMode } from "./messenger-state-store.js";
 
 export type MessengerTokenSource = "config" | "env" | "file" | "none";
-export type MessengerUnknownSenderMode = "pairing" | "leaderbot_free_tier";
 
 interface MessengerAccountBaseConfig {
   enabled?: boolean;
@@ -18,8 +17,6 @@ interface MessengerAccountBaseConfig {
   name?: string;
   allowFrom?: Array<string | number>;
   dmPolicy?: "open" | "allowlist" | "pairing" | "disabled";
-  unknownSenderMode?: MessengerUnknownSenderMode;
-  leaderbotBridgeEnabled?: boolean;
   defaultLang?: MessengerLanguage;
   responsePrefix?: string;
   webhookPath?: string;

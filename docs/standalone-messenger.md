@@ -2,8 +2,7 @@
 
 This is the standalone `openclaw-messenger` repository for the OpenClaw
 Facebook Page Messenger channel. It contains only the channel integration;
-the Leaderbot application and image-generation service are deliberately out of
-scope.
+application-specific services are deliberately out of scope.
 
 The supported flow is:
 
@@ -15,8 +14,8 @@ The plugin supports direct Page messages, sender authorization, pairing,
 webhook verification, duplicate protection, text replies, supported Messenger
 attachments, and channel-neutral actions rendered as Messenger quick replies.
 
-It does not provide image generation, video generation, credits, quota,
-checkout, subscriptions, tenant provisioning, or a dependency on Leaderbot.
+It does not provide product-specific generation, credits, quota, checkout,
+subscriptions, tenant provisioning, or application services.
 
 The manifest registers one channel, `facebook`, displayed as `Facebook (Page
 Messenger)` in the OpenClaw channel index. `messenger`, `fb`, and `fbm` are

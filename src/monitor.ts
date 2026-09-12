@@ -36,20 +36,6 @@ import {
 } from "openclaw/plugin-sdk/webhook-request-guards";
 import { resolveDefaultMessengerAccountId } from "./accounts.js";
 import {
-  forwardLeaderbotMessengerEvent,
-  requestLeaderbotImageGeneration,
-  type LeaderbotBridgeTrace,
-} from "./leaderbot-bridge.js";
-import {
-  classifyMessengerFastLaneIntent,
-  hasMessengerImageGenerationIntent,
-  normalizeFastLaneText,
-  resolveMessengerFastLaneReply,
-  resolveMessengerSourceImageGenerationPrompt,
-  shouldForwardMessengerImageOnlyEventToImageGen,
-  shouldForwardMessengerTextToImageGen,
-} from "./messenger-product-intents.js";
-import {
   buildMessengerPairingReply,
   normalizeMessengerLanguage,
   tMessenger,
@@ -90,27 +76,6 @@ import {
   handleMessengerWebhookVerification,
 } from "./webhook.js";
 
-export {
-  DEFAULT_IMAGE_GEN_URL,
-  IMAGE_GEN_REQUEST_TIMEOUT_MS,
-  forwardLeaderbotMessengerEvent,
-  requestLeaderbotImageGeneration,
-  resolveImageGenRequestConfig,
-  type LeaderbotBridgeTrace,
-} from "./leaderbot-bridge.js";
-
-export {
-  classifyMessengerFastLaneIntent,
-  hasMessengerImageGenerationIntent,
-  hasMessengerSourceImageEditIntent,
-  resolveMessengerConversationIntent,
-  resolveMessengerFastLaneReply,
-  resolveMessengerSourceImageGenerationPrompt,
-  shouldForwardMessengerImageOnlyEventToImageGen,
-  shouldForwardMessengerTextToImageGen,
-  type MessengerConversationIntent,
-} from "./messenger-product-intents.js";
-
 export interface MonitorMessengerProviderOptions {
   account: ResolvedMessengerAccount;
   config: OpenClawConfig;
@@ -132,28 +97,8 @@ const messengerWebhookInFlightLimiter = createWebhookInFlightLimiter();
 const activeMessengerTypingTurns = new Map<string, number>();
 const MESSENGER_MESSAGE_DEDUPE_TTL_MS = 10 * 60 * 1000;
 const MESSENGER_SLOW_REQUEST_LOG_MS = 5_000;
-const MESSENGER_PROMPT_MEMORY_TTL_MS = 30 * 60 * 1000;
-const MESSENGER_PROMPT_MEMORY_MAX_ENTRIES = 2_000;
-const recentMessengerAssistantPrompts = new Map<
-  string,
-  { prompt: string; expiresAt: number }
->();
-const recentMessengerAssistantPromptsByMessage = new Map<
-  string,
-  { prompt: string; expiresAt: number }
->();
-const recentMessengerAssistantRepliesByMessage = new Map<
-  string,
-  { text: string; expiresAt: number }
->();
-const recentMessengerAssistantReplies = new Map<
-  string,
-  { text: string; expiresAt: number }
->();
 const FACEBOOK_UNTRUSTED_TOOL_ALLOW = ["session_status"] as const;
 const FACEBOOK_UNTRUSTED_TOOL_DENY = [
-  "image_generate",
-  "video_generate",
   "music_generate",
   "browser",
   "canvas",
@@ -196,7 +141,12 @@ let activeMessengerEventJobs = 0;
 
 messengerEventLoopDelay.enable();
 
-type MessengerTrace = LeaderbotBridgeTrace;
+type MessengerTrace = {
+  reqId: string;
+  psidHash: string;
+  accountId: string;
+  startedAt: number;
+};
 
 function beginMessengerTypingTurn(params: {
   accountId: string;
@@ -236,8 +186,8 @@ export type MessengerAudioTranscript = {
   text: string;
 };
 
-const MESSENGER_IMAGE_FETCH_TIMEOUT_MS = 10_000;
-const MESSENGER_IMAGE_FETCH_MAX_BYTES = 10 * 1024 * 1024;
+const MESSENGER_IMAGE_ATTACHMENT_FETCH_TIMEOUT_MS = 10_000;
+const MESSENGER_IMAGE_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 const MESSENGER_MEDIA_FETCH_MAX_BYTES = 25 * 1024 * 1024;
 const MESSENGER_MEDIA_FETCH_MAX_REDIRECTS = 2;
 export function redactMessengerIdentifier(value: string | undefined): string {
@@ -403,8 +353,6 @@ function shouldLogMessengerStageToStdout(stage: string): boolean {
     stage === "webhook_received" ||
     stage === "messenger_ack_sent" ||
     stage === "intent_classified" ||
-    stage.startsWith("image_gen_request_") ||
-    stage.startsWith("messenger_event_forward_") ||
     stage === "request_completed"
   );
 }
@@ -570,7 +518,7 @@ export async function downloadMessengerMediaAttachment(params: {
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
-    MESSENGER_IMAGE_FETCH_TIMEOUT_MS,
+    MESSENGER_IMAGE_ATTACHMENT_FETCH_TIMEOUT_MS,
   );
   try {
     let currentUrl = parsed;
@@ -621,7 +569,7 @@ export async function downloadMessengerMediaAttachment(params: {
     const contentLength = Number(response.headers.get("content-length") ?? "0");
     const maxBytes =
       params.attachment.kind === "image"
-        ? MESSENGER_IMAGE_FETCH_MAX_BYTES
+        ? MESSENGER_IMAGE_ATTACHMENT_MAX_BYTES
         : MESSENGER_MEDIA_FETCH_MAX_BYTES;
     if (contentLength > maxBytes) {
       return null;
@@ -852,284 +800,6 @@ async function resolveMessengerAudioTranscripts(params: {
   return transcripts.filter(
     (entry): entry is MessengerAudioTranscript => entry !== null,
   );
-}
-
-function pruneRecentMessengerAssistantPrompts(now: number): void {
-  const pruneMap = (entries: Map<string, { expiresAt: number }>) => {
-    if (entries.size <= MESSENGER_PROMPT_MEMORY_MAX_ENTRIES) {
-      for (const [key, value] of entries) {
-        if (value.expiresAt <= now) {
-          entries.delete(key);
-        }
-      }
-      return;
-    }
-
-    for (const [key, value] of entries) {
-      if (value.expiresAt <= now) {
-        entries.delete(key);
-      }
-    }
-    for (const key of entries.keys()) {
-      if (entries.size <= MESSENGER_PROMPT_MEMORY_MAX_ENTRIES) {
-        break;
-      }
-      entries.delete(key);
-    }
-  };
-
-  pruneMap(recentMessengerAssistantPrompts);
-  pruneMap(recentMessengerAssistantPromptsByMessage);
-  pruneMap(recentMessengerAssistantReplies);
-  pruneMap(recentMessengerAssistantRepliesByMessage);
-}
-
-export function extractImagePromptFromAssistantReply(
-  text: string,
-): string | null {
-  const trimmed = text.trim();
-  if (!trimmed || !/\bprompt\b/i.test(trimmed)) {
-    return null;
-  }
-
-  const fencedMatches = [
-    ...trimmed.matchAll(/```(?:text|prompt)?\s*([\s\S]*?)```/gi),
-  ];
-  const fencedPrompt = fencedMatches
-    .map((match) => match[1]?.trim())
-    .filter((value): value is string => Boolean(value && value.length >= 20))
-    .at(-1);
-  if (fencedPrompt) {
-    return fencedPrompt;
-  }
-
-  const afterPromptLabel = trimmed
-    .match(/\bprompt\s*[:-]\s*([\s\S]+)/i)?.[1]
-    ?.trim();
-  if (afterPromptLabel && afterPromptLabel.length >= 20) {
-    return afterPromptLabel;
-  }
-
-  return null;
-}
-
-// This process-local TTL cache contains assistant text. Account + Page are the
-// required Messenger ownership boundary; sender/message identifiers alone are
-// never valid cache keys because they can overlap across configured tenants.
-type MessengerPromptMemoryScope = {
-  accountId: string;
-  pageId: string;
-  senderId: string;
-};
-
-function messengerPromptSenderKey(scope: MessengerPromptMemoryScope): string {
-  return JSON.stringify([scope.accountId, scope.pageId, scope.senderId]);
-}
-
-function messengerPromptMessageKey(
-  scope: MessengerPromptMemoryScope,
-  messageId: string,
-): string {
-  return JSON.stringify([
-    scope.accountId,
-    scope.pageId,
-    scope.senderId,
-    messageId,
-  ]);
-}
-
-function selectedOptionNumber(text: string): number | null {
-  const normalized = normalizeFastLaneText(text);
-  const match =
-    normalized.match(/^nr\s*(\d+)(?:\s*go)?$/) ??
-    normalized.match(/^nummer\s*(\d+)(?:\s*go)?$/) ??
-    normalized.match(/^option\s*(\d+)(?:\s*go)?$/) ??
-    normalized.match(/^(\d+)(?:\s*go)?$/);
-  const value = Number(match?.[1]);
-  return Number.isInteger(value) && value > 0 ? value : null;
-}
-
-function extractNumberedImageOptionFromAssistantReply(
-  assistantText: string,
-  userText: string,
-): string | null {
-  const optionNumber = selectedOptionNumber(userText);
-  if (!optionNumber) {
-    return null;
-  }
-
-  const optionLine = assistantText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find((line) => new RegExp(`^${optionNumber}[.)]\\s+`).test(line));
-  if (!optionLine) {
-    return null;
-  }
-
-  const option = optionLine
-    .replace(/^\d+[.)]\s+/, "")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/__([^_]+)__/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/[,.]$/g, "")
-    .replace(/^(?:of\s+)?(?:een|a|an)\s+/i, "")
-    .replace(/\s+maak$/i, "")
-    .trim();
-  if (!option) {
-    return null;
-  }
-  if (/\b(?:tekstprompt|image prompt|prompt)\b/i.test(option)) {
-    return null;
-  }
-
-  return /^(?:maak|genereer|create|generate)\b/i.test(option)
-    ? option
-    : `Maak deze afbeelding: ${option}`;
-}
-
-export function rememberMessengerAssistantPrompt(
-  params: MessengerPromptMemoryScope & {
-    text: string;
-    now?: number;
-    messageId?: string;
-  },
-): void {
-  const prompt = extractImagePromptFromAssistantReply(params.text);
-  const now = params.now ?? Date.now();
-  const expiresAt = now + MESSENGER_PROMPT_MEMORY_TTL_MS;
-  const normalizedMessageId = params.messageId?.trim();
-  const senderKey = messengerPromptSenderKey(params);
-  pruneRecentMessengerAssistantPrompts(now);
-  recentMessengerAssistantReplies.set(senderKey, {
-    text: params.text,
-    expiresAt,
-  });
-  if (normalizedMessageId) {
-    recentMessengerAssistantRepliesByMessage.set(
-      messengerPromptMessageKey(params, normalizedMessageId),
-      { text: params.text, expiresAt },
-    );
-  }
-  if (!prompt) {
-    return;
-  }
-  recentMessengerAssistantPrompts.set(senderKey, {
-    prompt,
-    expiresAt,
-  });
-  if (normalizedMessageId) {
-    recentMessengerAssistantPromptsByMessage.set(
-      messengerPromptMessageKey(params, normalizedMessageId),
-      { prompt, expiresAt },
-    );
-  }
-}
-
-function resolveRememberedMessengerAssistantPrompt(
-  params: MessengerPromptMemoryScope & {
-    now?: number;
-    replyToMessageId?: string;
-  },
-): string | null {
-  const now = params.now ?? Date.now();
-  pruneRecentMessengerAssistantPrompts(now);
-  const normalizedMessageId = params.replyToMessageId?.trim();
-  if (normalizedMessageId) {
-    const exact = recentMessengerAssistantPromptsByMessage.get(
-      messengerPromptMessageKey(params, normalizedMessageId),
-    )?.prompt;
-    if (exact) {
-      return exact;
-    }
-  }
-  return (
-    recentMessengerAssistantPrompts.get(messengerPromptSenderKey(params))
-      ?.prompt ?? null
-  );
-}
-
-function resolveMessengerAssistantReplyOptionPrompt(
-  params: MessengerPromptMemoryScope & {
-    text: string;
-    now?: number;
-    replyToMessageId?: string;
-  },
-): string | null {
-  pruneRecentMessengerAssistantPrompts(params.now ?? Date.now());
-  const normalizedMessageId = params.replyToMessageId?.trim();
-  if (normalizedMessageId) {
-    const exactAssistantReply = recentMessengerAssistantRepliesByMessage.get(
-      messengerPromptMessageKey(params, normalizedMessageId),
-    )?.text;
-    if (exactAssistantReply) {
-      return extractNumberedImageOptionFromAssistantReply(
-        exactAssistantReply,
-        params.text,
-      );
-    }
-  }
-
-  const assistantReply = recentMessengerAssistantReplies.get(
-    messengerPromptSenderKey(params),
-  )?.text;
-  return assistantReply
-    ? extractNumberedImageOptionFromAssistantReply(assistantReply, params.text)
-    : null;
-}
-
-function isPromptReferenceImageRequest(text: string): boolean {
-  const normalized = normalizeFastLaneText(text);
-  return (
-    /^(?:gebruik|use)\s+(?:deze|this)\s+prompt\s*(?:en\s+maak\s+(?:een\s+)?(?:afbeelding|foto|plaatje)|to\s+(?:make|create|generate)\s+(?:an?\s+)?(?:image|picture|photo))?\.?$/.test(
-      normalized,
-    ) ||
-    /^(?:maak|genereer|create|generate)\s+(?:deze|dit|this)\s*(?:afbeelding|foto|plaatje|image|picture|photo)?$/.test(
-      normalized,
-    ) ||
-    /^(?:maak|generate|create|go|start|ja|yes|ok|nr\s*\d+\s*go)$/.test(
-      normalized,
-    ) ||
-    selectedOptionNumber(text) !== null
-  );
-}
-
-function isExplicitPromptReferenceImageRequest(text: string): boolean {
-  const normalized = normalizeFastLaneText(text);
-  return (
-    /^(?:gebruik|use)\s+(?:deze|this)\s+prompt\s*(?:en\s+maak\s+(?:een\s+)?(?:afbeelding|foto|plaatje)|to\s+(?:make|create|generate)\s+(?:an?\s+)?(?:image|picture|photo))?\.?$/.test(
-      normalized,
-    ) ||
-    /^(?:maak|genereer|create|generate)\s+(?:deze|dit|this)\s*(?:afbeelding|foto|plaatje|image|picture|photo)?$/.test(
-      normalized,
-    )
-  );
-}
-
-export function resolveMessengerImagePromptFromUserText(
-  params: MessengerPromptMemoryScope & {
-    text: string;
-    now?: number;
-    replyToMessageId?: string;
-  },
-): string | null {
-  const text = params.text.trim();
-  if (isPromptReferenceImageRequest(text)) {
-    return (
-      resolveMessengerAssistantReplyOptionPrompt(params) ??
-      resolveRememberedMessengerAssistantPrompt(params)
-    );
-  }
-  const exactReplyPrompt = params.replyToMessageId
-    ? resolveRememberedMessengerAssistantPrompt(params)
-    : null;
-  if (
-    exactReplyPrompt &&
-    (isPromptReferenceImageRequest(text) ||
-      hasMessengerImageGenerationIntent(text))
-  ) {
-    return exactReplyPrompt;
-  }
-  return text;
 }
 
 export function shouldDeliverMessengerReplyPayload(
@@ -1393,48 +1063,7 @@ async function sendMessengerPairingReply(params: {
 
 type MessengerIngressDecision =
   | { action: "process"; commandAuthorized: boolean }
-  | { action: "leaderbot_free_tier"; commandAuthorized: false }
   | { action: "stop"; commandAuthorized: false };
-
-function isLeaderbotBridgeEnabled(account: ResolvedMessengerAccount): boolean {
-  // The standalone repository is Messenger chat only. Keep the old config
-  // field readable for migration, but never activate the retired bridge.
-  void account;
-  return false;
-}
-
-function shouldRouteUnknownSenderToLeaderbotFreeTier(params: {
-  account: ResolvedMessengerAccount;
-  dmPolicy: string;
-  event: MessengerWebhookMessaging;
-  senderId: string;
-  text: string;
-}): boolean {
-  return (
-    params.dmPolicy === "pairing" &&
-    params.senderId.trim().length > 0 &&
-    isLeaderbotBridgeEnabled(params.account) &&
-    params.account.config.unknownSenderMode === "leaderbot_free_tier" &&
-    shouldForwardUnknownSenderEventToLeaderbot(params.event, params.text)
-  );
-}
-
-function shouldForwardUnknownSenderEventToLeaderbot(
-  event: MessengerWebhookMessaging,
-  text: string,
-): boolean {
-  if (classifyMessengerFastLaneIntent(text) === "delete_data") {
-    return true;
-  }
-  if (hasMessengerInteractivePayload(event)) {
-    return true;
-  }
-  const attachments = event.message?.attachments ?? [];
-  if (attachments.length > 0) {
-    return true;
-  }
-  return shouldForwardMessengerTextToImageGen(text);
-}
 
 async function shouldProcessMessengerEvent(params: {
   event: MessengerWebhookMessaging;
@@ -1506,43 +1135,6 @@ async function shouldProcessMessengerEvent(params: {
     };
   }
   if (access.senderAccess.decision === "pairing") {
-    if (
-      shouldRouteUnknownSenderToLeaderbotFreeTier({
-        account: params.account,
-        dmPolicy,
-        event: params.event,
-        senderId,
-        text: rawText,
-      })
-    ) {
-      params.trace &&
-        logMessengerStage(params.trace, "intent_classified", {
-          decision: "leaderbot_free_tier",
-        });
-      logVerbose(
-        `messenger: routing unknown sender ${redactMessengerIdentifier(
-          senderId,
-        )} to Leaderbot free tier account=${params.account.accountId}`,
-      );
-      return { action: "leaderbot_free_tier", commandAuthorized: false };
-    }
-    if (
-      dmPolicy === "pairing" &&
-      senderId.trim().length > 0 &&
-      isLeaderbotBridgeEnabled(params.account) &&
-      params.account.config.unknownSenderMode === "leaderbot_free_tier"
-    ) {
-      params.trace &&
-        logMessengerStage(params.trace, "intent_classified", {
-          decision: "allow",
-        });
-      logVerbose(
-        `messenger: routing unknown sender ${redactMessengerIdentifier(
-          senderId,
-        )} to OpenClaw turn account=${params.account.accountId}`,
-      );
-      return { action: "process", commandAuthorized: false };
-    }
     params.trace &&
       logMessengerStage(params.trace, "intent_classified", {
         decision: "pairing",
@@ -1601,23 +1193,16 @@ export async function processMessengerEvent(params: {
         stateStore,
       });
     } catch (error) {
-      if (classifyMessengerFastLaneIntent(text) === "delete_data") {
-        logMessengerStage(params.trace, "intent_classified", {
-          decision: "privacy_request_shared_state_bypass",
-          errorCode: messengerSharedStateErrorCode(error),
-        });
-      } else {
-        logMessengerStage(params.trace, "intent_classified", {
-          decision: "shared_state_unavailable",
-          errorCode: messengerSharedStateErrorCode(error),
-        });
-        await sendMessengerText(
-          senderId,
-          tMessenger(lang, "sharedStateUnavailable"),
-          { cfg: params.cfg, accountId: params.account.accountId },
-        );
-        return;
-      }
+      logMessengerStage(params.trace, "intent_classified", {
+        decision: "shared_state_unavailable",
+        errorCode: messengerSharedStateErrorCode(error),
+      });
+      await sendMessengerText(
+        senderId,
+        tMessenger(lang, "sharedStateUnavailable"),
+        { cfg: params.cfg, accountId: params.account.accountId },
+      );
+      return;
     }
     if (!shouldProcessMessage) {
       logMessengerStage(params.trace, "duplicate_skipped");
@@ -1630,9 +1215,8 @@ export async function processMessengerEvent(params: {
     }
     const attachments = extractMessengerAttachmentUrls(params.event);
     const rawAttachmentCount = params.event.message?.attachments?.length ?? 0;
-    const leaderbotBridgeEnabled = isLeaderbotBridgeEnabled(params.account);
     if (rawAttachmentCount > 0 && attachments.length === 0 && !text.trim()) {
-      logMessengerStage(params.trace, "messenger_event_forward_skipped", {
+      logMessengerStage(params.trace, "attachment_skipped", {
         reason: "attachments_missing_payload_url",
         rawAttachments: rawAttachmentCount,
       });
@@ -1645,67 +1229,6 @@ export async function processMessengerEvent(params: {
       );
       return;
     }
-    if (
-      leaderbotBridgeEnabled &&
-      classifyMessengerFastLaneIntent(text) === "delete_data"
-    ) {
-      logMessengerStage(params.trace, "messenger_event_forward_started", {
-        reason: "delete_data_request",
-      });
-      if (
-        await forwardLeaderbotMessengerEvent({
-          event: params.event,
-          trace: params.trace,
-          leaderbotBridgeEnabled,
-          defaultLang: lang,
-          logStage: logMessengerStage,
-        })
-      ) {
-        return;
-      }
-      await sendMessengerText(
-        senderId,
-        tMessenger(lang, "deleteRequestFallback"),
-        {
-          cfg: params.cfg,
-          accountId: params.account.accountId,
-        },
-      );
-      return;
-    }
-    if (ingressDecision.action === "leaderbot_free_tier") {
-      logMessengerStage(params.trace, "messenger_event_forward_started", {
-        reason: "unknown_sender_leaderbot_free_tier",
-      });
-      if (
-        await forwardLeaderbotMessengerEvent({
-          event: params.event,
-          trace: params.trace,
-          leaderbotBridgeEnabled,
-          defaultLang: lang,
-          logStage: logMessengerStage,
-        })
-      ) {
-        return;
-      }
-      await sendMessengerText(
-        senderId,
-        tMessenger(lang, "imageGeneratorUnavailable"),
-        {
-          cfg: params.cfg,
-          accountId: params.account.accountId,
-        },
-      ).catch((err: unknown) => {
-        params.runtime.error?.(
-          danger(`messenger image generator fallback failed: ${String(err)}`),
-        );
-      });
-      return;
-    }
-    const sourceImageAttachment = attachments.find(
-      (attachment) => attachment.kind === "image",
-    );
-    const replyToMessageId = params.event.message?.reply_to?.mid;
     logVerbose(
       `messenger: received inbound event sender=${redactMessengerIdentifier(
         senderId,
@@ -1722,236 +1245,10 @@ export async function processMessengerEvent(params: {
           postback: Boolean(params.event.postback?.payload),
         },
       );
-      if (leaderbotBridgeEnabled) {
-        if (
-          await forwardLeaderbotMessengerEvent({
-            event: params.event,
-            trace: params.trace,
-            leaderbotBridgeEnabled,
-            defaultLang: lang,
-            logStage: logMessengerStage,
-          })
-        ) {
-          return;
-        }
-        await sendMessengerText(
-          senderId,
-          tMessenger(lang, "interactiveActionUnavailable"),
-          {
-            cfg: params.cfg,
-            accountId: params.account.accountId,
-          },
-        ).catch((err: unknown) => {
-          params.runtime.error?.(
-            danger(`messenger interactive fallback failed: ${String(err)}`),
-          );
-        });
-        return;
-      }
-      logMessengerStage(params.trace, "messenger_event_forward_skipped", {
+      logMessengerStage(params.trace, "interactive_payload_skipped", {
         reason: "disabled_by_config",
         route: "interactive_payload",
       });
-      return;
-    }
-    const sourceImageGenerationPrompt =
-      resolveMessengerSourceImageGenerationPrompt({
-        hasSourceImage: Boolean(sourceImageAttachment),
-        text,
-      });
-    if (
-      leaderbotBridgeEnabled &&
-      shouldForwardMessengerImageOnlyEventToImageGen({
-        hasSourceImage: Boolean(sourceImageAttachment),
-        text,
-      })
-    ) {
-      logMessengerStage(params.trace, "messenger_event_forward_started", {
-        reason: "source_image_without_prompt",
-        sourceImage: true,
-      });
-      if (
-        await forwardLeaderbotMessengerEvent({
-          event: params.event,
-          trace: params.trace,
-          leaderbotBridgeEnabled,
-          defaultLang: lang,
-          logStage: logMessengerStage,
-        })
-      ) {
-        return;
-      }
-    } else if (
-      !leaderbotBridgeEnabled &&
-      shouldForwardMessengerImageOnlyEventToImageGen({
-        hasSourceImage: Boolean(sourceImageAttachment),
-        text,
-      })
-    ) {
-      logMessengerStage(params.trace, "messenger_event_forward_skipped", {
-        reason: "disabled_by_config",
-        route: "source_image_without_prompt",
-      });
-    }
-    if (
-      leaderbotBridgeEnabled &&
-      sourceImageAttachment &&
-      sourceImageGenerationPrompt
-    ) {
-      logMessengerStage(params.trace, "messenger_event_forward_started", {
-        reason: "source_image_with_prompt",
-        sourceImage: true,
-        hasPrompt: true,
-      });
-      if (
-        await forwardLeaderbotMessengerEvent({
-          event: params.event,
-          trace: params.trace,
-          leaderbotBridgeEnabled,
-          defaultLang: lang,
-          logStage: logMessengerStage,
-        })
-      ) {
-        return;
-      }
-      await sendMessengerText(
-        senderId,
-        tMessenger(lang, "imageGeneratorUnavailable"),
-        {
-          cfg: params.cfg,
-          accountId: params.account.accountId,
-        },
-      ).catch((err: unknown) => {
-        params.runtime.error?.(
-          danger(`messenger image generator fallback failed: ${String(err)}`),
-        );
-      });
-      return;
-    } else if (
-      !leaderbotBridgeEnabled &&
-      sourceImageAttachment &&
-      sourceImageGenerationPrompt
-    ) {
-      logMessengerStage(params.trace, "messenger_event_forward_skipped", {
-        reason: "disabled_by_config",
-        route: "source_image_with_prompt",
-      });
-    }
-    if (
-      leaderbotBridgeEnabled &&
-      attachments.length > 0 &&
-      !sourceImageGenerationPrompt &&
-      hasMessengerImageGenerationIntent(text)
-    ) {
-      logMessengerStage(params.trace, "messenger_event_forward_started", {
-        reason: "media_with_image_prompt",
-        isSourceImageEdit: false,
-        hasPrompt: true,
-      });
-      if (
-        await forwardLeaderbotMessengerEvent({
-          event: params.event,
-          trace: params.trace,
-          leaderbotBridgeEnabled,
-          defaultLang: lang,
-          logStage: logMessengerStage,
-        })
-      ) {
-        return;
-      }
-      await sendMessengerText(
-        senderId,
-        tMessenger(lang, "imageGeneratorUnavailable"),
-        {
-          cfg: params.cfg,
-          accountId: params.account.accountId,
-        },
-      ).catch((err: unknown) => {
-        params.runtime.error?.(
-          danger(`messenger image generator fallback failed: ${String(err)}`),
-        );
-      });
-      return;
-    } else if (
-      !leaderbotBridgeEnabled &&
-      attachments.length > 0 &&
-      !sourceImageGenerationPrompt &&
-      hasMessengerImageGenerationIntent(text)
-    ) {
-      logMessengerStage(params.trace, "messenger_event_forward_skipped", {
-        reason: "disabled_by_config",
-        route: "media_with_image_prompt",
-      });
-    }
-    const referencedPrompt = resolveMessengerImagePromptFromUserText({
-      accountId: params.account.accountId,
-      pageId: params.account.pageId,
-      senderId,
-      text,
-      replyToMessageId,
-    });
-    if (
-      leaderbotBridgeEnabled &&
-      attachments.length === 0 &&
-      referencedPrompt &&
-      referencedPrompt !== text.trim()
-    ) {
-      logMessengerStage(params.trace, "image_gen_request_started", {
-        sourceImage: false,
-        hasPrompt: true,
-        promptSource: replyToMessageId
-          ? "messenger_reply"
-          : "assistant_reference",
-      });
-      const queued = await requestLeaderbotImageGeneration({
-        psid: senderId,
-        pageId: params.account.pageId,
-        prompt: referencedPrompt,
-        reqId: params.trace.reqId,
-        timestamp,
-        trace: params.trace,
-        leaderbotBridgeEnabled,
-        lang,
-        logStage: logMessengerStage,
-      });
-      if (queued) {
-        return;
-      }
-      await sendMessengerText(
-        senderId,
-        tMessenger(lang, "imageGeneratorUnavailable"),
-        {
-          cfg: params.cfg,
-          accountId: params.account.accountId,
-        },
-      );
-      return;
-    } else if (
-      !leaderbotBridgeEnabled &&
-      attachments.length === 0 &&
-      referencedPrompt &&
-      referencedPrompt !== text.trim()
-    ) {
-      logMessengerStage(params.trace, "image_gen_request_skipped", {
-        reason: "disabled_by_config",
-        promptSource: replyToMessageId
-          ? "messenger_reply"
-          : "assistant_reference",
-      });
-    }
-    if (
-      attachments.length === 0 &&
-      !referencedPrompt &&
-      isExplicitPromptReferenceImageRequest(text)
-    ) {
-      await sendMessengerText(
-        senderId,
-        tMessenger(lang, "missingReferencedPrompt"),
-        {
-          cfg: params.cfg,
-          accountId: params.account.accountId,
-        },
-      );
       return;
     }
     const hasAudioAttachment = attachments.some(
@@ -2014,63 +1311,6 @@ export async function processMessengerEvent(params: {
     ]
       .filter(Boolean)
       .join("\n");
-    if (
-      leaderbotBridgeEnabled &&
-      !hasMedia &&
-      shouldForwardMessengerTextToImageGen(text)
-    ) {
-      logMessengerStage(params.trace, "messenger_event_forward_started", {
-        reason: "text_image_intent",
-        sourceImage: false,
-        hasPrompt: true,
-      });
-      if (
-        await forwardLeaderbotMessengerEvent({
-          event: params.event,
-          trace: params.trace,
-          leaderbotBridgeEnabled,
-          defaultLang: lang,
-          logStage: logMessengerStage,
-        })
-      ) {
-        return;
-      }
-      await sendMessengerText(
-        senderId,
-        tMessenger(lang, "imageGeneratorUnavailable"),
-        {
-          cfg: params.cfg,
-          accountId: params.account.accountId,
-        },
-      );
-      return;
-    } else if (
-      !leaderbotBridgeEnabled &&
-      !hasMedia &&
-      shouldForwardMessengerTextToImageGen(text)
-    ) {
-      logMessengerStage(params.trace, "messenger_event_forward_skipped", {
-        reason: "disabled_by_config",
-        route: "text_image_intent",
-      });
-    }
-    const fastLane = hasMedia
-      ? null
-      : resolveMessengerFastLaneReply(text, lang);
-    if (fastLane) {
-      logMessengerStage(params.trace, "first_response_ready", {
-        intent: fastLane.intent,
-      });
-      const result = await sendMessengerText(senderId, fastLane.reply, {
-        cfg: params.cfg,
-        accountId: params.account.accountId,
-      });
-      logMessengerStage(params.trace, "messenger_response_sent", {
-        intent: fastLane.intent,
-        message: redactMessengerIdentifier(result.messageId),
-      });
-      return;
-    }
     // Command-shaped text is never authorization on the public gateway. The
     // ingress resolver owns sender authorization, and the public boundary keeps
     // even allowed senders on the same closed tool surface.
@@ -2236,14 +1476,6 @@ export async function processMessengerEvent(params: {
                     quickReplies: getMessengerQuickReplies(deliveryPayload),
                   },
                 );
-                rememberMessengerAssistantPrompt({
-                  accountId: params.account.accountId,
-                  pageId: params.account.pageId,
-                  senderId,
-                  text: deliveryPayload.text,
-                  now: Date.now(),
-                  messageId: result.messageId,
-                });
                 logMessengerStage(params.trace, "messenger_response_sent", {
                   message: redactMessengerIdentifier(result.messageId),
                 });

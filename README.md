@@ -4,9 +4,9 @@ Standalone OpenClaw channel plugin for Facebook Page Messenger direct
 messages. Users can talk to the configured OpenClaw assistant through
 Messenger; replies are sent back through the Meta Graph API.
 
-This repository is intentionally chat-only. Image/video generation, paid
-credits, quota, checkout, subscriptions, tenant provisioning, and the Leaderbot
-application are outside its scope.
+This repository is intentionally chat-only. Product-specific generation,
+payments, quotas, subscriptions, tenant provisioning, and application logic are
+outside its scope.
 
 ## Channel
 

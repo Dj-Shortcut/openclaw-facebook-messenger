@@ -34,14 +34,6 @@
             "enum": ["open", "allowlist", "pairing", "disabled"],
             "default": "pairing"
           },
-          "unknownSenderMode": {
-            "type": "string",
-            "enum": ["pairing", "leaderbot_free_tier"]
-          },
-          "leaderbotBridgeEnabled": {
-            "type": "boolean",
-            "default": false
-          },
           "defaultLang": {
             "type": "string",
             "enum": ["nl", "en"],
@@ -81,13 +73,6 @@
                   "enum": ["open", "allowlist", "pairing", "disabled"],
                   "default": "pairing"
                 },
-                "unknownSenderMode": {
-                  "type": "string",
-                  "enum": ["pairing", "leaderbot_free_tier"]
-                },
-                "leaderbotBridgeEnabled": {
-                  "type": "boolean"
-                },
                 "defaultLang": {
                   "type": "string",
                   "enum": ["nl", "en"]
@@ -111,10 +96,8 @@
         "verifyTokenFile": { "label": "Webhook verify token file" },
         "webhookPath": { "label": "Webhook path", "placeholder": "/facebook/webhook" },
         "dmPolicy": { "label": "Direct message policy" },
-        "unknownSenderMode": { "label": "Unknown sender mode (legacy bridge compatibility)" },
-        "leaderbotBridgeEnabled": { "label": "Enable legacy Leaderbot bridge" },
         "defaultLang": { "label": "Default response language" },
-        "sharedStateStore": { "label": "Shared dedupe and budget store" },
+        "sharedStateStore": { "label": "Shared dedupe store" },
         "allowFrom": { "label": "Allowed Page-scoped sender IDs" }
       }
     }

@@ -34,14 +34,12 @@ describe("openclaw plugin manifest", () => {
     const facebookSchema = manifest.channelConfigs?.facebook?.schema as {
       properties?: {
         dmPolicy?: { default?: unknown };
-        leaderbotBridgeEnabled?: { default?: unknown };
         defaultLang?: { default?: unknown; enum?: unknown };
         sharedStateStore?: { default?: unknown; enum?: unknown };
         accounts?: {
           additionalProperties?: {
             properties?: {
               dmPolicy?: { default?: unknown };
-              leaderbotBridgeEnabled?: { default?: unknown };
               defaultLang?: { default?: unknown; enum?: unknown };
             };
           };
@@ -52,7 +50,6 @@ describe("openclaw plugin manifest", () => {
     expect(
       facebookSchema.properties?.accounts?.additionalProperties?.properties?.dmPolicy?.default,
     ).toBe("pairing");
-    expect(facebookSchema.properties?.leaderbotBridgeEnabled?.default).toBe(false);
     expect(facebookSchema.properties?.defaultLang).toMatchObject({
       default: "nl",
       enum: ["nl", "en"],
@@ -61,10 +58,6 @@ describe("openclaw plugin manifest", () => {
       default: "memory",
       enum: ["memory", "redis"],
     });
-    expect(
-      facebookSchema.properties?.accounts?.additionalProperties?.properties
-        ?.leaderbotBridgeEnabled?.default,
-    ).toBeUndefined();
     expect(
       facebookSchema.properties?.accounts?.additionalProperties?.properties
         ?.defaultLang,
@@ -134,25 +127,9 @@ describe("facebook config safety defaults", () => {
     const parsed = MessengerConfigSchema.parse({});
 
     expect(parsed.dmPolicy).toBe("pairing");
-    expect(parsed.leaderbotBridgeEnabled).toBe(false);
     expect(parsed.defaultLang).toBe("nl");
     expect(parsed.sharedStateStore).toBe("memory");
     expect(parsed.allowFrom).toBeUndefined();
-  });
-
-  it("does not materialize a false Leaderbot bridge override for named accounts", () => {
-    const parsed = MessengerConfigSchema.parse({
-      leaderbotBridgeEnabled: true,
-      accounts: {
-        public: {
-          dmPolicy: "pairing",
-        },
-      },
-    });
-
-    expect(parsed.leaderbotBridgeEnabled).toBe(true);
-    expect(parsed.accounts?.public?.leaderbotBridgeEnabled).toBeUndefined();
-    expect(parsed.accounts?.public?.defaultLang).toBeUndefined();
   });
 
   it("accepts English globally and as an explicit named-account override", () => {

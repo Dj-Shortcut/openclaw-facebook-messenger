@@ -61,7 +61,7 @@ describe("memory Messenger ephemeral state store", () => {
     const store = getMemoryMessengerEphemeralStateStore();
     const base = {
       scope: { accountId: "account-a", pageId: "page-a" },
-      kind: "image_forward" as const,
+      kind: "audio_transcription" as const,
       dayKey: "2026-08-21",
       cap: 20,
       expiresAtMs: 2_000_000,
@@ -95,7 +95,7 @@ describe("memory Messenger ephemeral state store", () => {
     })).rejects.toMatchObject({ code: "config" });
 
     const base = {
-      kind: "image_forward" as const,
+      kind: "audio_transcription" as const,
       dayKey: "2026-08-21",
       cap: 1,
       expiresAtMs: 2_000_000,

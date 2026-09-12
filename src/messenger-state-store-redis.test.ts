@@ -14,7 +14,7 @@ describe("Redis Messenger ephemeral state store", () => {
       {
         scope: { accountId: "raw-account", pageId: "raw-page" },
         eventIdentity: "raw-mid-and-sender",
-        kind: "image_forward",
+        kind: "audio_transcription",
         dayKey: "2026-08-21",
       },
     );
@@ -104,7 +104,7 @@ describe("Redis Messenger ephemeral state store", () => {
         Array.from({ length: 100 }, (_, index) =>
           (index % 2 === 0 ? storeA : storeB).reserveDaily({
             scope: { accountId: "account-ci", pageId: "page-ci" },
-            kind: "image_forward",
+            kind: "audio_transcription",
             dayKey: "2026-08-21",
             eventIdentity: `event-${index}`,
             cap: 20,
@@ -117,7 +117,7 @@ describe("Redis Messenger ephemeral state store", () => {
 
       await expect(storeA.reserveDaily({
         scope: { accountId: "account-ci", pageId: "page-ci-b" },
-        kind: "image_forward",
+        kind: "audio_transcription",
         dayKey: "2026-08-21",
         eventIdentity: "event-page-b",
         cap: 20,
@@ -133,7 +133,7 @@ describe("Redis Messenger ephemeral state store", () => {
       const pageAPartition = buildRedisMessengerStateKeys(config, {
         scope: { accountId: "account-ci", pageId: "page-ci" },
         eventIdentity: "unused",
-        kind: "image_forward",
+        kind: "audio_transcription",
         dayKey: "2026-08-21",
       }).partition;
       expect(

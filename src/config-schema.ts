@@ -8,7 +8,6 @@ import { z } from "zod";
 import type { ResolvedMessengerAccount } from "./types.js";
 
 const DmPolicySchema = z.enum(["open", "allowlist", "pairing", "disabled"]);
-const UnknownSenderModeSchema = z.enum(["pairing", "leaderbot_free_tier"]);
 const MessengerLanguageSchema = z.enum(["nl", "en"]);
 const MessengerSharedStateStoreSchema = z.enum(["memory", "redis"]);
 const MessengerCommonConfigShape = {
@@ -23,8 +22,6 @@ const MessengerCommonConfigShape = {
   name: z.string().optional(),
   allowFrom: z.array(z.union([z.string(), z.number()])).optional(),
   dmPolicy: DmPolicySchema.optional().default("pairing"),
-  unknownSenderMode: UnknownSenderModeSchema.optional(),
-  leaderbotBridgeEnabled: z.boolean().optional().default(false),
   defaultLang: MessengerLanguageSchema.optional(),
   responsePrefix: z.string().optional(),
   webhookPath: z.string().optional(),
@@ -40,7 +37,6 @@ const MessengerCommonConfigSchemaBase = z.object({
 const MessengerAccountConfigSchema = z
   .object({
     ...MessengerCommonConfigShape,
-    leaderbotBridgeEnabled: z.boolean().optional(),
   })
   .strict()
   .superRefine((value, ctx) => {

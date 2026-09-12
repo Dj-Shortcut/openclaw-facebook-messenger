@@ -10,12 +10,10 @@ OpenClaw to Facebook Page Messenger direct messages through Meta webhooks:
   Graph API.
 
 It does not yet implement Instagram DMs, Page comment handling, Meta Private
-Replies/comment-to-DM flows, general OpenClaw attachment handling, or general
-Meta automation. Messenger media payloads are accepted only for supported DM
-ingestion paths, with optional Leaderbot image-generation handling disabled by
-default. The plugin is named `facebook` because the setup is a Facebook/Meta
-integration, even though the first supported surface is Facebook Page Messenger
-DMs.
+Replies/comment-to-DM flows, or general Meta automation. Messenger media
+payloads are accepted only for supported DM ingestion paths. The plugin is
+named `facebook` because the setup is a Facebook/Meta integration, even though
+the first supported surface is Facebook Page Messenger DMs.
 
 This is the short setup path. For a complete guide to the Meta app, Facebook
 Page identity, permissions, review, Messenger rules, production checks, and
@@ -176,19 +174,8 @@ continuity. Pause ingress, rotate at a UTC-day boundary, and retain the old
 namespace until its TTLs expire.
 
 This store does not persist webhook work after Meta receives the HTTP
-acknowledgement. Keep a single gateway replica until a durable tenant-scoped
+acknowledgement. Keep a single gateway replica until a durable account-scoped
 ingress queue/outbox closes that availability gap.
-
-The legacy optional Leaderbot image-generation bridge is off by default. If you enable
-`leaderbotBridgeEnabled: true`, selected Messenger events, Page-scoped sender
-IDs, image prompts, and Messenger media URLs can be forwarded to the separate
-Leaderbot image-generation service. Do not enable that bridge unless the Page is
-intended to use external Leaderbot image generation and the behavior is
-disclosed to users.
-
-New Leaderbot customer Pages do not use this bridge. Their Meta webhook points
-directly to `apps/image-gen`; the checked-in personal OpenClaw gateway remains
-pairing-only with the bridge disabled.
 
 You can also provide the same values through the default environment variables:
 
@@ -327,10 +314,9 @@ to your runtime configuration. Before enabling this for a public Page, publish a
 privacy policy, disclose automated/AI handling where required, and decide what
 data is retained, deleted, or shared with third-party providers.
 
-If this Page is public or paid, treat Facebook as a metered entry point rather
-than full assistant access. Keep budget gates, tool policy, credit balances, and
-provider cost ledgers in the OpenClaw host runtime where model/tool calls
-execute. This transport plugin does not implement billing or provider budgets.
+This transport plugin does not implement billing or product-specific provider
+controls. Keep tool policy and any application-specific limits in the OpenClaw
+host where model and tool calls execute.
 
 ### Allowlist Mode
 
@@ -353,15 +339,15 @@ One plugin install can hold multiple Page accounts:
 {
   channels: {
     facebook: {
-      defaultAccount: "leaderbot",
+      defaultAccount: "primary",
       accounts: {
-        leaderbot: {
-          name: "Leaderbot",
-          pageId: "<LEADERBOT_PAGE_ID>",
-          pageAccessToken: "<LEADERBOT_PAGE_ACCESS_TOKEN>",
+        primary: {
+          name: "Primary",
+          pageId: "<PRIMARY_PAGE_ID>",
+          pageAccessToken: "<PRIMARY_PAGE_ACCESS_TOKEN>",
           appSecret: "<META_APP_SECRET>",
-          verifyToken: "<LEADERBOT_VERIFY_TOKEN>",
-          webhookPath: "/facebook/leaderbot",
+          verifyToken: "<PRIMARY_VERIFY_TOKEN>",
+          webhookPath: "/facebook/primary",
           dmPolicy: "pairing",
         },
         support: {
@@ -498,7 +484,6 @@ Not included:
 - Instagram DMs;
 - Facebook Page comment handling;
 - Meta Private Replies/comment-to-DM flows;
-- generic attachments, templates, quick replies, or media messages;
 - automatic Page subscription setup;
 - generic Meta platform routing.
 
