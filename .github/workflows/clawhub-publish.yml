@@ -86,3 +86,42 @@ jobs:
             args+=(--dry-run)
           fi
           npx --yes clawhub@0.22.0 "${args[@]}"
+
+      - name: Verify public ClawHub release
+        if: ${{ inputs.dry_run == false }}
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          endpoint="https://clawhub.ai/api/v1/packages/%40dj-shortcut%2Ffacebook/versions/${RELEASE_VERSION}"
+
+          for attempt in $(seq 1 20); do
+            response="$(curl --silent --show-error --write-out $'\n%{http_code}' \
+              --header "Accept: application/json" \
+              --header "Authorization: Bearer ${CLAWHUB_TOKEN}" \
+              "${endpoint}?readback=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${attempt}")"
+            status="${response##*$'\n'}"
+            body="${response%$'\n'*}"
+
+            if [[ "${status}" == "200" ]]; then
+              visible_version="$(jq -r '.version.version // empty' <<<"${body}")"
+              latest_version="$(jq -r '.package.latestVersion // empty' <<<"${body}")"
+              source_repo="$(jq -r '.version.verification.sourceRepo // empty' <<<"${body}")"
+
+              if [[ "${visible_version}" == "${RELEASE_VERSION}" && \
+                    "${latest_version}" == "${RELEASE_VERSION}" && \
+                    "${source_repo}" == "Dj-Shortcut/openclaw-facebook-messenger" ]]; then
+                echo "ClawHub public read-back confirmed: ${visible_version}"
+                exit 0
+              fi
+            fi
+
+            if (( attempt == 20 )); then
+              echo "ClawHub accepted the upload, but the exact release was not publicly visible after 10 minutes." >&2
+              exit 1
+            fi
+
+            echo "Waiting for ClawHub verification/publication (${attempt}/20; HTTP ${status})"
+            sleep 30
+          done
