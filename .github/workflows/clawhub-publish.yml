@@ -1,0 +1,88 @@
+name: Publish to ClawHub
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish; must match package.json"
+        required: true
+        type: string
+      changelog:
+        description: "ClawHub release changelog"
+        required: true
+        type: string
+      dry_run:
+        description: "Validate and preview only"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Validate and publish package
+    runs-on: ubuntu-latest
+    environment: clawhub-release
+
+    steps:
+      - name: Check out selected revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify package
+        run: |
+          npm run build
+          npm test
+          npm pack --dry-run
+
+      - name: Verify requested version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          test "$(node -p "require('./package.json').version")" = "$RELEASE_VERSION"
+
+      - name: Log in to ClawHub
+        if: ${{ inputs.dry_run == false }}
+        env:
+          CLAWHUB_CONFIG_PATH: ${{ runner.temp }}/clawhub-config.json
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: |
+          test -n "$CLAWHUB_TOKEN"
+          npx --yes clawhub@0.22.0 login --token "$CLAWHUB_TOKEN" --label "GitHub Actions"
+          npx --yes clawhub@0.22.0 whoami
+
+      - name: Publish package to ClawHub
+        env:
+          CLAWHUB_CONFIG_PATH: ${{ runner.temp }}/clawhub-config.json
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_CHANGELOG: ${{ inputs.changelog }}
+        run: |
+          set -euo pipefail
+          args=(
+            package
+            publish
+            .
+            --family code-plugin
+            --owner dj-shortcut
+            --version "$RELEASE_VERSION"
+            --changelog "$RELEASE_CHANGELOG"
+            --source-repo "Dj-Shortcut/openclaw-facebook-messenger"
+            --source-commit "$GITHUB_SHA"
+            --source-ref "$GITHUB_REF_NAME"
+            --json
+          )
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            args+=(--dry-run)
+          fi
+          npx --yes clawhub@0.22.0 "${args[@]}"

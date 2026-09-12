@@ -44,3 +44,15 @@ npm pack --dry-run
 
 See [`docs/standalone-messenger.md`](docs/standalone-messenger.md) for the
 scope, migration boundary, and channel-list acceptance check.
+
+## Automation
+
+GitHub Actions runs the build, test suite, and package dry-run on pushes to
+`main` and on pull requests. Dependabot checks npm dependencies (including the
+OpenClaw peer/build dependency) and GitHub Actions weekly.
+
+ClawHub publishing is available through the manually started `Publish to
+ClawHub` workflow. Add a `CLAWHUB_TOKEN` repository secret, protect the
+`clawhub-release` environment if approval is required, and start the workflow
+with a version matching `package.json`. It defaults to a dry-run; disable that
+input only for an intentional release.
