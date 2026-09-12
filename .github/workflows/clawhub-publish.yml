@@ -94,20 +94,28 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          endpoint="https://clawhub.ai/api/v1/packages/%40dj-shortcut%2Ffacebook/versions/${RELEASE_VERSION}"
+          version_endpoint="https://clawhub.ai/api/v1/packages/%40dj-shortcut%2Ffacebook/versions/${RELEASE_VERSION}"
+          package_endpoint="https://clawhub.ai/api/v1/packages/%40dj-shortcut%2Ffacebook"
 
           for attempt in $(seq 1 20); do
-            response="$(curl --silent --show-error --write-out $'\n%{http_code}' \
+            version_response="$(curl --silent --show-error --write-out $'\n%{http_code}' \
               --header "Accept: application/json" \
               --header "Authorization: Bearer ${CLAWHUB_TOKEN}" \
-              "${endpoint}?readback=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${attempt}")"
-            status="${response##*$'\n'}"
-            body="${response%$'\n'*}"
+              "${version_endpoint}?readback=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${attempt}")"
+            version_status="${version_response##*$'\n'}"
+            version_body="${version_response%$'\n'*}"
 
-            if [[ "${status}" == "200" ]]; then
-              visible_version="$(jq -r '.version.version // empty' <<<"${body}")"
-              latest_version="$(jq -r '.package.latestVersion // empty' <<<"${body}")"
-              source_repo="$(jq -r '.version.verification.sourceRepo // empty' <<<"${body}")"
+            package_response="$(curl --silent --show-error --write-out $'\n%{http_code}' \
+              --header "Accept: application/json" \
+              --header "Authorization: Bearer ${CLAWHUB_TOKEN}" \
+              "${package_endpoint}?readback=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${attempt}")"
+            package_status="${package_response##*$'\n'}"
+            package_body="${package_response%$'\n'*}"
+
+            if [[ "${version_status}" == "200" && "${package_status}" == "200" ]]; then
+              visible_version="$(jq -r '.version.version // empty' <<<"${version_body}")"
+              latest_version="$(jq -r '.package.latestVersion // empty' <<<"${package_body}")"
+              source_repo="$(jq -r '.version.verification.sourceRepo // empty' <<<"${version_body}")"
 
               if [[ "${visible_version}" == "${RELEASE_VERSION}" && \
                     "${latest_version}" == "${RELEASE_VERSION}" && \
@@ -122,6 +130,6 @@ jobs:
               exit 1
             fi
 
-            echo "Waiting for ClawHub verification/publication (${attempt}/20; HTTP ${status})"
+            echo "Waiting for ClawHub verification/publication (${attempt}/20; version HTTP ${version_status}, package HTTP ${package_status})"
             sleep 30
           done
