@@ -10,6 +10,9 @@ import type { ResolvedMessengerAccount } from "./types.js";
 const DmPolicySchema = z.enum(["open", "allowlist", "pairing", "disabled"]);
 const MessengerLanguageSchema = z.enum(["nl", "en"]);
 const MessengerSharedStateStoreSchema = z.enum(["memory", "redis"]);
+type OpenClawRefinementContext = Parameters<
+  typeof requireChannelOpenAllowFrom
+>[0]["ctx"];
 const MessengerCommonConfigShape = {
   enabled: z.boolean().optional(),
   pageId: z.string().optional(),
@@ -44,7 +47,7 @@ const MessengerAccountConfigSchema = z
       channel: "facebook",
       policy: value.dmPolicy,
       allowFrom: value.allowFrom,
-      ctx,
+      ctx: ctx as unknown as OpenClawRefinementContext,
       requireOpenAllowFrom,
     });
   });
@@ -60,7 +63,7 @@ export const MessengerConfigSchema = MessengerCommonConfigSchemaBase.extend({
       channel: "facebook",
       policy: value.dmPolicy,
       allowFrom: value.allowFrom,
-      ctx,
+      ctx: ctx as unknown as OpenClawRefinementContext,
       requireOpenAllowFrom,
     });
   });
