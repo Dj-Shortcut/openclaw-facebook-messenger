@@ -10,7 +10,7 @@ The channel has been tested in a live Messenger conversation with the
 dedicated **OpenClaw** Facebook Page. The screenshot shows messages sent to
 the Page and the assistant's reply delivered back in Messenger.
 
-![Live Messenger proof of concept](docs/assets/messenger-proof-of-concept.png)
+![Live Messenger proof of concept](https://raw.githubusercontent.com/Dj-Shortcut/openclaw-facebook-messenger/main/docs/assets/messenger-proof-of-concept.png)
 
 This repository is intentionally chat-only. Product-specific generation,
 payments, quotas, subscriptions, tenant provisioning, and application logic are
@@ -50,8 +50,8 @@ npm run check
 npm pack --dry-run
 ```
 
-See [`docs/standalone-messenger.md`](docs/standalone-messenger.md) for the
-scope, migration boundary, and channel-list acceptance check.
+See [`docs/standalone-messenger.md`](https://github.com/Dj-Shortcut/openclaw-facebook-messenger/blob/main/docs/standalone-messenger.md)
+for the scope, migration boundary, and channel-list acceptance check.
 
 ## Automation
 

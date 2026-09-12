@@ -1,6 +1,6 @@
 {
   "name": "@dj-shortcut/facebook",
-  "version": "2026.7.2-beta.7",
+  "version": "2026.7.2-beta.8",
   "private": true,
   "description": "Standalone OpenClaw Messenger channel plugin",
   "type": "module",
@@ -23,6 +23,7 @@
     "README.md",
     "docs/security/README.md",
     "docs/security/SECURITY.md",
+    "docs/assets/messenger-proof-of-concept.png",
     "docs/setup.md",
     "docs/standalone-messenger.md",
     "examples"
