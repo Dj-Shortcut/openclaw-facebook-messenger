@@ -15,9 +15,9 @@ payloads are accepted only for supported DM ingestion paths. The plugin is
 named `facebook` because the setup is a Facebook/Meta integration, even though
 the first supported surface is Facebook Page Messenger DMs.
 
-This is the short setup path. For a complete guide to the Meta app, Facebook
-Page identity, permissions, review, Messenger rules, production checks, and
-troubleshooting, see [facebook-complete-tutorial.md](facebook-complete-tutorial.md).
+This guide covers the complete setup path, including the Meta app, Facebook
+Page identity, permissions, Messenger rules, production checks, and
+troubleshooting.
 
 Official Meta references:
 
