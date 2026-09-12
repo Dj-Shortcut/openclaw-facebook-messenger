@@ -33,6 +33,7 @@ import {
   beginWebhookRequestPipelineOrReject,
   createWebhookInFlightLimiter,
   readWebhookBodyOrReject,
+  runDetachedWebhookWork,
 } from "openclaw/plugin-sdk/webhook-request-guards";
 import { resolveDefaultMessengerAccountId } from "./accounts.js";
 import {
@@ -1731,11 +1732,13 @@ export async function monitorMessengerProvider(
           res.statusCode = 200;
           res.setHeader("Content-Type", "application/json");
           res.end(JSON.stringify({ status: "ok" }));
-          void processScheduledMessengerEvents({
-            scheduledEvents,
-            cfg: opts.config,
-            runtime: opts.runtime,
-          });
+          void runDetachedWebhookWork(() =>
+            processScheduledMessengerEvents({
+              scheduledEvents,
+              cfg: opts.config,
+              runtime: opts.runtime,
+            }),
+          );
         } catch (error) {
           opts.runtime.error?.(
             danger(`messenger webhook error: ${String(error)}`),
