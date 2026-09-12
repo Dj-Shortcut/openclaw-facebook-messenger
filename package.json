@@ -1,12 +1,12 @@
 {
   "name": "@dj-shortcut/facebook",
-  "version": "2026.7.2-beta.8",
+  "version": "2026.7.2-beta.9",
   "private": true,
   "description": "Standalone OpenClaw Messenger channel plugin",
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=24.15.0",
+    "node": ">=24.16.0",
     "npm": ">=11.12.1"
   },
   "repository": {
@@ -92,8 +92,8 @@
       "minGatewayVersion": "2026.6.11"
     },
     "build": {
-      "openclawVersion": "2026.7.2-beta.7",
-      "pluginSdkVersion": "2026.7.2-beta.7"
+      "openclawVersion": "2026.9.3",
+      "pluginSdkVersion": "2026.9.3"
     },
     "install": {
       "clawhubSpec": "clawhub:@dj-shortcut/facebook",
